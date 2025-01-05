@@ -4,8 +4,9 @@ AI Code Reviewer - Main application entry point
 """
 
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from analyzer import CodeAnalyzer
 
 app = FastAPI(
     title="AI Code Reviewer",
@@ -28,6 +29,43 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+@app.post("/analyze")
+async def analyze_code(file: UploadFile = File(...)):
+    """Analyze uploaded code file"""
+    if not file.filename:
+        return {"error": "No file provided"}
+    
+    # Save uploaded file temporarily
+    temp_path = f"/tmp/{file.filename}"
+    
+    try:
+        content = await file.read()
+        with open(temp_path, "wb") as f:
+            f.write(content)
+        
+        # Analyze the file
+        analyzer = CodeAnalyzer()
+        issues = analyzer.analyze_file(temp_path)
+        
+        # Clean up temp file
+        os.unlink(temp_path)
+        
+        return {
+            "filename": file.filename,
+            "issues_count": len(issues),
+            "issues": [
+                {
+                    "line": issue.line,
+                    "type": issue.issue_type,
+                    "message": issue.message,
+                    "severity": issue.severity
+                } for issue in issues
+            ]
+        }
+        
+    except Exception as e:
+        return {"error": f"Analysis failed: {str(e)}"}
 
 if __name__ == "__main__":
     import uvicorn
