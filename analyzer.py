@@ -6,6 +6,7 @@ import ast
 import os
 from typing import List, Dict, Any
 from dataclasses import dataclass
+from config import ConfigManager
 
 @dataclass
 class CodeIssue:
@@ -15,8 +16,10 @@ class CodeIssue:
     severity: str
 
 class CodeAnalyzer:
-    def __init__(self):
+    def __init__(self, config_path: str = '.aireviewer.json'):
         self.supported_extensions = ['.py', '.js', '.ts', '.java', '.cpp', '.c']
+        self.config_manager = ConfigManager(config_path)
+        self.config = self.config_manager.config
     
     def analyze_file(self, file_path: str) -> List[CodeIssue]:
         """Analyze a single file and return list of issues"""
@@ -40,16 +43,17 @@ class CodeAnalyzer:
                 tree = ast.parse(content)
                 
             # Check for long functions
-            for node in ast.walk(tree):
-                if isinstance(node, ast.FunctionDef):
-                    func_lines = node.end_lineno - node.lineno
-                    if func_lines > 50:
-                        issues.append(CodeIssue(
-                            line=node.lineno,
-                            issue_type="complexity",
-                            message=f"Function '{node.name}' is too long ({func_lines} lines)",
-                            severity="warning"
-                        ))
+            if 'complexity' in self.config.enabled_checks:
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.FunctionDef):
+                        func_lines = node.end_lineno - node.lineno
+                        if func_lines > self.config.max_function_lines:
+                            issues.append(CodeIssue(
+                                line=node.lineno,
+                                issue_type="complexity",
+                                message=f"Function '{node.name}' is too long ({func_lines} lines)",
+                                severity=self.config.severity_levels.get('complexity', 'warning')
+                            ))
                         
         except Exception as e:
             issues.append(CodeIssue(
@@ -69,14 +73,15 @@ class CodeAnalyzer:
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
                 
-            for i, line in enumerate(lines, 1):
-                if len(line.strip()) > 120:
-                    issues.append(CodeIssue(
-                        line=i,
-                        issue_type="style",
-                        message="Line too long (>120 characters)",
-                        severity="info"
-                    ))
+            if 'style' in self.config.enabled_checks:
+                for i, line in enumerate(lines, 1):
+                    if len(line.strip()) > self.config.max_line_length:
+                        issues.append(CodeIssue(
+                            line=i,
+                            issue_type="style",
+                            message=f"Line too long (>{self.config.max_line_length} characters)",
+                            severity=self.config.severity_levels.get('style', 'info')
+                        ))
                         
         except Exception as e:
             issues.append(CodeIssue(
