@@ -42,7 +42,7 @@ class CodeAnalyzer:
                 content = f.read()
                 tree = ast.parse(content)
                 
-            # Check for long functions
+            # Check for long functions and other complexity issues
             if 'complexity' in self.config.enabled_checks:
                 for node in ast.walk(tree):
                     if isinstance(node, ast.FunctionDef):
@@ -55,6 +55,27 @@ class CodeAnalyzer:
                                 severity=self.config.severity_levels.get('complexity', 'warning')
                             ))
                         
+                        # Check for too many parameters
+                        param_count = len(node.args.args)
+                        if param_count > 5:
+                            issues.append(CodeIssue(
+                                line=node.lineno,
+                                issue_type="complexity",
+                                message=f"Function '{node.name}' has too many parameters ({param_count})",
+                                severity=self.config.severity_levels.get('complexity', 'warning')
+                            ))
+                    
+                    # Check for deep nesting
+                    if isinstance(node, (ast.If, ast.For, ast.While)):
+                        nesting_depth = self._calculate_nesting_depth(node)
+                        if nesting_depth > 3:
+                            issues.append(CodeIssue(
+                                line=node.lineno,
+                                issue_type="complexity",
+                                message=f"Code block has deep nesting (depth: {nesting_depth})",
+                                severity=self.config.severity_levels.get('complexity', 'warning')
+                            ))
+                        
         except Exception as e:
             issues.append(CodeIssue(
                 line=1,
@@ -64,6 +85,21 @@ class CodeAnalyzer:
             ))
         
         return issues
+    
+    def _calculate_nesting_depth(self, node):
+        """Calculate the nesting depth of a code block"""
+        def count_nested_blocks(n, depth=0):
+            max_depth = depth
+            for child in ast.iter_child_nodes(n):
+                if isinstance(child, (ast.If, ast.For, ast.While, ast.With)):
+                    child_depth = count_nested_blocks(child, depth + 1)
+                    max_depth = max(max_depth, child_depth)
+                else:
+                    child_depth = count_nested_blocks(child, depth)
+                    max_depth = max(max_depth, child_depth)
+            return max_depth
+        
+        return count_nested_blocks(node, 1)
     
     def _basic_analysis(self, file_path: str) -> List[CodeIssue]:
         """Basic analysis for non-Python files"""

@@ -7,12 +7,14 @@ import argparse
 import sys
 import os
 from analyzer import CodeAnalyzer
+from report import ReportGenerator
 
 def main():
     parser = argparse.ArgumentParser(description='AI Code Reviewer - Analyze code files for issues')
     parser.add_argument('file', help='Path to the file to analyze')
-    parser.add_argument('--format', choices=['text', 'json'], default='text', 
+    parser.add_argument('--format', choices=['text', 'json', 'html'], default='text', 
                        help='Output format (default: text)')
+    parser.add_argument('--output', '-o', help='Output file path (optional)')
     
     args = parser.parse_args()
     
@@ -23,33 +25,21 @@ def main():
     analyzer = CodeAnalyzer()
     issues = analyzer.analyze_file(args.file)
     
-    if args.format == 'json':
-        import json
-        result = {
-            'file': args.file,
-            'issues_count': len(issues),
-            'issues': [
-                {
-                    'line': issue.line,
-                    'type': issue.issue_type,
-                    'message': issue.message,
-                    'severity': issue.severity
-                } for issue in issues
-            ]
-        }
-        print(json.dumps(result, indent=2))
+    # Generate report
+    report_gen = ReportGenerator()
+    report_content = report_gen.generate_report(args.file, issues, args.format)
+    
+    # Output report
+    if args.output:
+        try:
+            with open(args.output, 'w', encoding='utf-8') as f:
+                f.write(report_content)
+            print(f"Report saved to: {args.output}")
+        except Exception as e:
+            print(f"Error saving report: {e}", file=sys.stderr)
+            sys.exit(1)
     else:
-        print(f"Analyzing: {args.file}")
-        print(f"Found {len(issues)} issues:\n")
-        
-        for issue in issues:
-            severity_symbol = {
-                'error': '❌',
-                'warning': '⚠️', 
-                'info': 'ℹ️'
-            }.get(issue.severity, '•')
-            
-            print(f"{severity_symbol} Line {issue.line}: {issue.message} ({issue.issue_type})")
+        print(report_content)
 
 if __name__ == '__main__':
     main()
