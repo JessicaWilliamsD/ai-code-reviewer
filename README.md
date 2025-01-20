@@ -20,9 +20,18 @@ pip install -r requirements.txt
 
 ### CLI Usage
 
+Single file analysis:
 ```bash
 python cli.py path/to/your/file.py
 python cli.py --format json path/to/your/file.py
+python cli.py --format html --output report.html path/to/your/file.py
+```
+
+Batch analysis for directories:
+```bash
+python cli.py --batch src/
+python cli.py --batch --pattern "**/*.py" src/
+python cli.py --batch --format json --output batch_report.json src/
 ```
 
 ### API Usage
